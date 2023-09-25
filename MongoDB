@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Sep 25 19:38:01 2023
+
+@author: mindabelete@nyu.edu
+"""
+
+
+
+import gzip
+import json
+from pymongo import MongoClient
+
+# 1. Unzip and parse the JSON wikidata dump you downloaded
+def read_json_gz_file(filename):
+    with gzip.open(filename, 'rt') as f:
+        buffer = ""
+        for line in f:
+            buffer += line.strip()
+            try:
+                obj = json.loads(buffer)
+                yield obj
+                buffer = ""
+            except json.JSONDecodeError:
+                continue
+
+
+# 2. Extract relevant city data (assuming a specific format, adapt as needed)
+def extract_cities(data):
+    for item in data:
+        # This is a very basic filter, you might need to adapt it based on the actual structure of your dump
+        if 'type' in item and item['type'] == 'city':
+            yield {
+                'wikidata_id': item.get('id', ''),
+                'geo-coordinates': item.get('coordinates', ''),
+                'country': item.get('country', ''),
+                'instance_of': item.get('instance_of', '')
+            }
+
+# 3. Insert the extracted data into MongoDB
+def insert_to_mongodb(city):
+    client = MongoClient('localhost', 27017)
+    db = client.city_data
+    collection = db.european_cities
+    collection.insert_one(city)
+
+# Putting it all together:
+data = read_json_gz_file('/Users/ew1555/Desktop/Wiki_2022/Data/Dump/T_cities-most.json.gz')
+for city in extract_cities(data):
+    insert_to_mongodb(city)
